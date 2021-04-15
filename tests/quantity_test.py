@@ -14,6 +14,10 @@
 
 """Tests for google3.third_party.py.jax_md.energy."""
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 from absl.testing import absltest
 from absl.testing import parameterized
 
@@ -28,7 +32,6 @@ from jax_md.util import *
 from jax import test_util as jtu
 
 jax_config.parse_flags_with_absl()
-jax_config.enable_omnistaging()
 FLAGS = jax_config.FLAGS
 
 test_util.update_test_tolerance(1e-5, 2e-7)
@@ -88,7 +91,7 @@ class QuantityTest(jtu.JaxTestCase):
          [[1, c45, 0],
           [c45, 1, 0],
           [0, 0, 0]]], dtype=dtype)
-    self.assertAllClose(cangles, true_cangles)
+    self.assertAllClose(cangles, true_cangles, True)
 
   @parameterized.named_parameters(jtu.cases_from_list(
       {
@@ -116,7 +119,7 @@ class QuantityTest(jtu.JaxTestCase):
         [[[1, c45], [c45, 1]],
          [[1, 1], [1, 1]],
          [[1, 1], [1, 1]]], dtype=dtype)
-    self.assertAllClose(cangles, true_cangles)
+    self.assertAllClose(cangles, true_cangles, True)
 
 
   @parameterized.named_parameters(jtu.cases_from_list(
@@ -136,128 +139,6 @@ class QuantityTest(jtu.JaxTestCase):
     gs = np.mean(gs, axis=0)
     assert np.argmax(gs) == np.argmin((rs - 1.) ** 2)
     assert gs.dtype == dtype
-
-  @parameterized.named_parameters(jtu.cases_from_list(
-      {
-          'testcase_name': '_dtype={}'.format(dtype.__name__),
-          'dtype': dtype,
-      } for dtype in DTYPES))
-  def test_pair_correlation_species(self, dtype):
-    displacement = lambda Ra, Rb, **kwargs: Ra - Rb
-    R = np.array(
-        [[1, 0],
-         [0, 0],
-         [10, 1],
-         [10, 3]], dtype=dtype)
-    species = np.array([0, 0, 1, 1])
-    rs = np.linspace(0, 2, 60, dtype=dtype)
-    g = quantity.pair_correlation(displacement, rs, f32(0.1), species)
-    g_0, g_1 = g(R)
-    g_0 = np.mean(g_0, axis=0)
-    g_1 = np.mean(g_1, axis=0)
-    self.assertAllClose(np.argmax(g_0), np.argmin((rs - 1.) ** 2))
-    self.assertAllClose(np.argmax(g_1), np.argmin((rs - 2.) ** 2))
-    assert g_0.dtype == dtype
-    assert g_1.dtype == dtype
-
-  @parameterized.named_parameters(jtu.cases_from_list(
-      {
-          'testcase_name': f'_dim={dim}_dtype={dtype.__name__}',
-          'dim': dim,
-          'dtype': dtype,
-      } for dim in SPATIAL_DIMENSION for dtype in DTYPES))
-  def test_pair_correlation_neighbor_list_species(self, dim, dtype):
-    N = 100
-    L = 10.
-    displacement, _ = space.periodic(L)
-    R = random.uniform(random.PRNGKey(0), (N, dim), dtype=dtype)
-    species = np.where(np.arange(N) < N // 2, 0, 1)
-    rs = np.linspace(0, 2, 60, dtype=dtype)
-    g = quantity.pair_correlation(displacement, rs, f32(0.1), species)
-    nbr_fn, g_neigh = quantity.pair_correlation_neighbor_list(displacement,
-                                                              L,
-                                                              rs,
-                                                              f32(0.1),
-                                                              species)
-    nbrs = nbr_fn(R)
-
-    g_0, g_1 = g(R)
-    g_0 = np.mean(g_0, axis=0)
-    g_1 = np.mean(g_1, axis=0)
-
-    g_0_neigh, g_1_neigh = g_neigh(R, neighbor=nbrs)
-    g_0_neigh = np.mean(g_0_neigh, axis=0)
-    g_1_neigh = np.mean(g_1_neigh, axis=0)
-    self.assertAllClose(g_0, g_0_neigh)
-    self.assertAllClose(g_1, g_1_neigh)
-
-  @parameterized.named_parameters(jtu.cases_from_list(
-      {
-          'testcase_name': f'_dim={dim}_dtype={dtype.__name__}',
-          'dim': dim,
-          'dtype': dtype,
-      } for dim in SPATIAL_DIMENSION for dtype in DTYPES))
-  def test_pair_correlation_neighbor_list(self, dim, dtype):
-    N = 100
-    L = 10.
-    displacement, _ = space.periodic(L)
-    R = random.uniform(random.PRNGKey(0), (N, dim), dtype=dtype)
-    rs = np.linspace(0, 2, 60, dtype=dtype)
-    g = quantity.pair_correlation(displacement, rs, f32(0.1))
-    nbr_fn, g_neigh = quantity.pair_correlation_neighbor_list(displacement,
-                                                              L,
-                                                              rs,
-                                                              f32(0.1))
-    nbrs = nbr_fn(R)
-
-    g_0 = g(R)
-    g_0 = np.mean(g_0, axis=0)
-
-    g_0_neigh = g_neigh(R, neighbor=nbrs)
-    g_0_neigh = np.mean(g_0_neigh, axis=0)
-
-    self.assertAllClose(g_0, g_0_neigh)
-
-  @parameterized.named_parameters(jtu.cases_from_list(
-      {
-          'testcase_name': f'_dim={dim}_dtype={dtype.__name__}_window={window}',
-          'spatial_dim': dim,
-          'dtype': dtype,
-          'window': window
-      } for dim in SPATIAL_DIMENSION
-        for dtype in DTYPES
-        for window in [10, 20]))
-  def test_phop(self, spatial_dim, dtype, window):
-    Ra = np.ones((1, spatial_dim), dtype=dtype)
-    Rb = 2. * np.ones((1, spatial_dim), dtype=dtype)
-    half_window = window // 2
-
-    displacement_fn = lambda Ra, Rb: Ra - Rb
-
-    init_fn, push_fn = quantity.phop(displacement_fn, window)
-
-    phop_state = init_fn(Ra)
-
-    # E_A[R] = 1
-    # E_B[R] = 1 + i / half_window
-    # E_A[(R - E_B[R]) ** 2] = (i / half_window) ** 2
-    # E_B[(R - E_A[R]) ** 2] = (i / half_window)
-    # phop = (i / half_window) ** (3 / 2)
-
-    for i in range(half_window):
-      phop_state = push_fn(phop_state, Rb)
-      self.assertAllClose(
-        phop_state.phop,
-        np.array([(float(i) / half_window) ** (3. / 2)], dtype=dtype))
-
-
-  def test_maybe_downcast(self):
-    if not FLAGS.jax_enable_x64:
-      self.skipTest('Maybe downcast only works for float32 mode.')
-
-    x = np.array([1, 2, 3], np.float64)
-    x = maybe_downcast(x)
-    self.assertEqual(x.dtype, np.float64)
 
 if __name__ == '__main__':
   absltest.main()

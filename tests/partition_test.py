@@ -14,6 +14,10 @@
 
 """Tests for google3.third_party.py.jax_md.mapping."""
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 from absl.testing import absltest
 from absl.testing import parameterized
 
@@ -34,7 +38,6 @@ from jax_md import smap, partition, space, energy, quantity
 from jax_md.util import *
 
 jax_config.parse_flags_with_absl()
-jax_config.enable_omnistaging()
 FLAGS = jax_config.FLAGS
 
 
@@ -69,22 +72,22 @@ class CellListTest(jtu.JaxTestCase):
 
     cell_list = cell_fn(R)
 
-    self.assertAllClose(R[0], cell_list.position_buffer[0, 0, 0])
-    self.assertAllClose(R[1], cell_list.position_buffer[1, 8, 1])
-    self.assertAllClose(R[2], cell_list.position_buffer[1, 8, 0])
-    self.assertAllClose(R[3], cell_list.position_buffer[7, 3, 1])
+    self.assertAllClose(R[0], cell_list.R_buffer[0, 0, 0], True)
+    self.assertAllClose(R[1], cell_list.R_buffer[1, 8, 1], True)
+    self.assertAllClose(R[2], cell_list.R_buffer[1, 8, 0], True)
+    self.assertAllClose(R[3], cell_list.R_buffer[7, 3, 1], True)
 
-    self.assertEqual(0, cell_list.id_buffer[0, 0, 0])
-    self.assertEqual(1, cell_list.id_buffer[1, 8, 1])
-    self.assertEqual(2, cell_list.id_buffer[1, 8, 0])
-    self.assertEqual(3, cell_list.id_buffer[7, 3, 1])
+    self.assertEqual(0, cell_list.id_buffer[0, 0, 0], True)
+    self.assertEqual(1, cell_list.id_buffer[1, 8, 1], True)
+    self.assertEqual(2, cell_list.id_buffer[1, 8, 0], True)
+    self.assertEqual(3, cell_list.id_buffer[7, 3, 1], True)
 
     id_flat = np.reshape(cell_list.id_buffer, (-1,))
-    R_flat = np.reshape(cell_list.position_buffer, (-1, 2))
+    R_flat = np.reshape(cell_list.R_buffer, (-1, 2))
 
     R_out = np.zeros((5, 2), dtype)
     R_out = ops.index_update(R_out, id_flat, R_flat)[:-1]
-    self.assertAllClose(R_out, R)
+    self.assertAllClose(R_out, R, True)
 
   @parameterized.named_parameters(jtu.cases_from_list(
       {
@@ -104,11 +107,11 @@ class CellListTest(jtu.JaxTestCase):
     cell_list = cell_fn(R)
 
     id_flat = np.reshape(cell_list.id_buffer, (-1,))
-    R_flat = np.reshape(cell_list.position_buffer, (-1, dim))
+    R_flat = np.reshape(cell_list.R_buffer, (-1, dim))
     R_out = np.zeros((PARTICLE_COUNT + 1, dim))
     R_out = ops.index_update(R_out, id_flat, R_flat)[:-1]
 
-    self.assertAllClose(R_out, R)
+    self.assertAllClose(R_out, R, True)
 
   @parameterized.named_parameters(jtu.cases_from_list(
       {
@@ -128,10 +131,10 @@ class CellListTest(jtu.JaxTestCase):
     cell_list = cell_fn(R)
 
     id_flat = np.reshape(cell_list.id_buffer, (-1,))
-    R_flat = np.reshape(cell_list.position_buffer, (-1, dim))
+    R_flat = np.reshape(cell_list.R_buffer, (-1, dim))
     R_out = np.zeros((PARTICLE_COUNT + 1, dim))
     R_out = ops.index_update(R_out, id_flat, R_flat)[:-1]
-    self.assertAllClose(R_out, R)
+    self.assertAllClose(R_out, R, True)
 
   @parameterized.named_parameters(jtu.cases_from_list(
       {
@@ -154,7 +157,7 @@ class CellListTest(jtu.JaxTestCase):
     cell_list = cell_fn(R, side_data=side_data)
 
     id_flat = np.reshape(cell_list.id_buffer, (-1,))
-    R_flat = np.reshape(cell_list.position_buffer, (-1, dim))
+    R_flat = np.reshape(cell_list.R_buffer, (-1, dim))
     R_out = np.zeros((PARTICLE_COUNT + 1, dim), dtype)
     R_out = ops.index_update(R_out, id_flat, R_flat)[:-1]
 
@@ -165,8 +168,8 @@ class CellListTest(jtu.JaxTestCase):
     side_data_out = ops.index_update(
       side_data_out, id_flat, side_data_flat)[:-1]
 
-    self.assertAllClose(R_out, R)
-    self.assertAllClose(side_data_out, side_data)
+    self.assertAllClose(R_out, R, True)
+    self.assertAllClose(side_data_out, side_data, True)
 
 class NeighborListTest(jtu.JaxTestCase):
   @parameterized.named_parameters(jtu.cases_from_list(
@@ -215,7 +218,7 @@ class NeighborListTest(jtu.JaxTestCase):
       dR_exact_row = dR_exact[i]
       dR_exact_row = np.array(dR_exact_row[dR_exact_row > 0.], dtype)
 
-      self.assertAllClose(dR_row, dR_exact_row)
+      self.assertAllClose(dR_row, dR_exact_row, True)
 
   @parameterized.named_parameters(jtu.cases_from_list(
       {
@@ -240,7 +243,7 @@ class NeighborListTest(jtu.JaxTestCase):
     # TODO(schsam): Get cell-list working with anisotropic cell sizes.
     cell_size = cutoff / min_length
 
-    displacement, _ = space.periodic_general(box_fn(0.0))
+    displacement, _ = space.periodic_general(box_fn)
     metric = space.metric(displacement)
 
     R = random.uniform(key, (PARTICLE_COUNT, dim), dtype=dtype)
@@ -249,11 +252,11 @@ class NeighborListTest(jtu.JaxTestCase):
                                                1.1, cell_size=cell_size,
                                                t=np.array(0.))
 
-    idx = neighbor_list_fn(R, box=box_fn(np.array(0.25))).idx
+    idx = neighbor_list_fn(R, t=np.array(0.25)).idx
     R_neigh = R[idx]
     mask = idx < N
 
-    metric = partial(metric, box=box_fn(0.25))
+    metric = partial(metric, t=f32(0.25))
     d = vmap(vmap(metric, (None, 0)))
     dR = d(R, R_neigh)
 
@@ -273,6 +276,6 @@ class NeighborListTest(jtu.JaxTestCase):
       dR_exact_row = dR_exact[i]
       dR_exact_row = dR_exact_row[dR_exact_row > 0.]
 
-      self.assertAllClose(dR_row, dR_exact_row)
+      self.assertAllClose(dR_row, dR_exact_row, True)
 if __name__ == '__main__':
   absltest.main()

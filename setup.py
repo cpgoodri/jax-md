@@ -24,15 +24,14 @@ with io.open(os.path.join(this_directory, 'README.md'), encoding='utf-8') as f:
 INSTALL_REQUIRES = [
     'absl-py',
     'numpy',
-    'jax>=0.1.73',
-    'jaxlib>=0.1.52',
-    'dm-haiku>=0.0.2',
+    'jax>=0.1.55',
+    'jaxlib>=0.1.37',
     'dataclasses'
 ]
 
 setuptools.setup(
     name='jax-md',
-    version='0.1.13',
+    version='0.1.5',
     license='Apache 2.0',
     author='Google',
     author_email='jax-md-dev@google.com',

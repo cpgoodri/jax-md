@@ -1,10 +1,8 @@
-# JAX, M.D.
+# JAX, M.D. [[arXiv](https://arxiv.org/abs/1912.04232)]
 
 ### Accelerated, Differentiable, Molecular Dynamics
 [**Quickstart**](#getting-started)
 | [**Reference docs**](https://jax-md.readthedocs.io/en/latest/)
-| [**Paper**](https://arxiv.org/pdf/1912.04232.pdf)
-| [**NeurIPS 2020**](https://neurips.cc/virtual/2020/public/poster_83d3d4b6c9579515e1679aca8cbc8033.html)
 
 [![Build Status](https://travis-ci.org/google/jax-md.svg?branch=master)](https://travis-ci.org/google/jax-md) [![PyPI](https://img.shields.io/pypi/v/jax-md)](https://pypi.org/project/jax-md/) [![PyPI - License](https://img.shields.io/pypi/l/jax_md)](https://github.com/google/jax-md/blob/master/LICENSE)
 
@@ -42,9 +40,6 @@ To get started playing around with JAX MD check out the following colab notebook
 - [NVT Simulation](https://colab.research.google.com/github/google/jax-md/blob/master/notebooks/nvt_simulation.ipynb)
 - [NVE with Neighbor Lists](https://colab.research.google.com/github/google/jax-md/blob/master/notebooks/nve_neighbor_list.ipynb)
 - [Custom Potentials](https://colab.research.google.com/github/google/jax-md/blob/master/notebooks/customizing_potentials_cookbook.ipynb)
-- [Neural Network Potentials](https://colab.research.google.com/github/google/jax-md/blob/master/notebooks/neural_networks.ipynb)
-- [Flocking](https://colab.research.google.com/github/google/jax-md/blob/master/notebooks/flocking.ipynb)
-- [Meta Optimization](https://colab.research.google.com/github/google/jax-md/blob/master/notebooks/meta_optimization.ipynb)
 
 You can install JAX MD locally with pip,
 ```
@@ -60,7 +55,7 @@ pip install -e jax-md
 
 We now summarize the main components of the library.
 
-## Spaces ([`space.py`](https://jax-md.readthedocs.io/en/latest/jax_md.space.html))
+## Spaces ([`space.py`](https://github.com/google/jax-md/blob/master/jax_md/space.py))
 
 In general we must have a way of computing the pairwise distance between atoms.
 We must also have efficient strategies for moving atoms in some space that may
@@ -80,7 +75,7 @@ box_size = 25.0
 displacement_fn, shift_fn = space.periodic(box_size)
 ```
 
-## Potential Energy ([`energy.py`](https://jax-md.readthedocs.io/en/latest/jax_md.energy.html))
+## Potential Energy ([`energy.py`](https://github.com/google/jax-md/blob/master/jax_md/energy.py))
 
 In the simplest case, molecular dynamics calculations are often based on a pair
 potential that is defined by a user. This then is used to compute a total energy
@@ -88,15 +83,10 @@ whose negative gradient gives forces. One of the very nice things about JAX is
 that we get forces for free! The second part of the code is devoted to computing
 energies. 
 
-We provide the following classical potentials:
+We provide the following potentials:
 - `energy.soft_sphere` a soft sphere whose energy incrases as the overlap of the spheres to some power, `alpha`.
 - `energy.lennard_jones` a standard 12-6 lennard-jones potential.
-- `energy.morse` a morse potential.
 - `energy.eam` embedded atom model potential with ability to load parameters from LAMMPS files.
-
-We also provide the following neural network potentials:
-- `energy.behler_parrinello` a widely used fixed-feature neural network architecture for molecular systems.
-- `energy.graph_network` a deep graph neural network designed for energy fitting.
 
 For finite-ranged potentials it is often useful to consider only interactions within a certain neighborhood. We include the `_neighbor_list` modifier to the above potentials that uses a list of neighbors (see below) for optimization.
 
@@ -116,7 +106,7 @@ force_fn = quantity.force(energy_fn)
 print('Total Squared Force = {}'.format(np.sum(force_fn(R) ** 2)))
 ```
 
-## Dynamics ([`simulate.py`](https://jax-md.readthedocs.io/en/latest/jax_md.simulate.html), [`minimize.py`](https://jax-md.readthedocs.io/en/latest/jax_md.minimize.html))
+## Dynamics ([`simulate.py`](https://github.com/google/jax-md/blob/master/jax_md/simulate.py), [`minimize.py`](https://github.com/google/jax-md/blob/master/jax_md/minimize.py))
 
 Given an energy function and a system, there are a number of dynamics are useful
 to simulate. The simulation code is based on the structure of the optimizers
@@ -155,7 +145,7 @@ for _ in range(100):
 R = state.position
 ```
 
-## Spatial Partitioning ([`partition.py`](https://jax-md.readthedocs.io/en/latest/jax_md.partition.html))
+## Spatial Partitioning ([`partition.py`](https://github.com/google/jax-md/blob/master/jax_md/partition.py))
 
 In many applications, it is useful to construct spatial partitions of particles / objects in a simulation. 
 
@@ -177,19 +167,12 @@ Neighbor List Example:
 ```python
 from jax_md import partition
 
-neighbor_list_fn = partition.neighbor_list(displacement_fn, box_size, cell_size)
-neighbors = neighbor_list_fn(R) # Create a new neighbor list.
+neighbor_list_fn = partition.neighbor_list(displacement_fn, box_size, cell_size, R)
+neighbor_idx = neighbor_list_fn(R) 
 
-# Do some simulating....
-
-neighbors = neighbor_list_fn(R, neighbors)  # Update the neighbor list without resizing.
-if neighbors.did_buffer_overflow:  # Couldn't fit all the neighbors into the list.
-  neighbors = neighbor_list_fn(R)  # So create a new neighbor list.
-
-# neighbors.idx is a [N, max_neighbors] ndarray of neighbor ids for each particle.
+# neighbor_idx is a [N, max_neighbors] ndarray of neighbor ids for each particle.
 # Empty slots are marked by id == N.
 ```
-
 # Development
 
 JAX MD is under active development. We have very limited development resources and so we typically focus on adding features that will have high impact to researchers using JAX MD (including us). Please don't hesitate to open feature requests to help us guide development. We more than welcome contributions!
@@ -214,14 +197,14 @@ config.update("jax_enable_x64", True)
 If you use the code in a publication, please cite the repo using the .bib,
 
 ```
-@inproceedings{jaxmd2020,
- author = {Schoenholz, Samuel S. and Cubuk, Ekin D.},
- booktitle = {Advances in Neural Information Processing Systems},
- publisher = {Curran Associates, Inc.},
- title = {JAX M.D. A Framework for Differentiable Physics},
- url = {https://papers.nips.cc/paper/2020/file/83d3d4b6c9579515e1679aca8cbc8033-Paper.pdf},
- volume = {33},
- year = {2020}
+@misc{jaxmd2019,
+    title={JAX M.D.: End-to-End Differentiable, Hardware Accelerated, Molecular Dynamics in Pure Python},
+    author={Samuel S. Schoenholz and Ekin D. Cubuk},
+    year={2019},
+    eprint={1912.04232},
+    archivePrefix={arXiv},
+    primaryClass={stat.ML},
+    howpublished={\url{https://github.com/google/jax-md}, \url{https://arxiv.org/abs/1912.04232}},
 }
 ```
 

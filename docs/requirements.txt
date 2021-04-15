@@ -1,6 +1,5 @@
-sphinx>=3
+sphinx
 sphinx_rtd_theme
-jax
 jaxlib
 ipykernel
 nbsphinx
